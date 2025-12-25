@@ -176,8 +176,8 @@ class EpubSerializer(Serializer):
 
             chapter = self._create_single_chapter(
                 chapter_messages,
-                f"第 {chapter_num} 章",
-                f"chapter_{chapter_num}.xhtml"
+                f'第 {chapter_num} 章',
+                f'chapter_{chapter_num}.xhtml'
             )
             chapters.append(chapter)
 
@@ -188,17 +188,17 @@ class EpubSerializer(Serializer):
 
         for i, msg in enumerate(messages):
             chapter_num = i + 1
-            chapter_title = f"對話 {chapter_num}"
+            chapter_title = f'對話 {chapter_num}'
 
             content_preview = msg['content'][:20].replace('\n', ' ')
             if len(msg['content']) > 20:
                 content_preview += "..."
-            chapter_title += f": {content_preview}"
+            chapter_title += f': {content_preview}'
 
             chapter = self._create_single_chapter(
                 [msg],
                 chapter_title,
-                f"message_{chapter_num}.xhtml"
+                f'message_{chapter_num}.xhtml'
             )
             chapters.append(chapter)
 
@@ -217,8 +217,8 @@ class EpubSerializer(Serializer):
                 if current_chapter_messages:
                     chapter = self._create_single_chapter(
                         current_chapter_messages,
-                        f"第 {chapter_num} 章",
-                        f"chapter_{chapter_num}.xhtml"
+                        f'第 {chapter_num} 章',
+                        f'chapter_{chapter_num}.xhtml'
                     )
                     chapters.append(chapter)
                     chapter_num += 1
@@ -230,8 +230,8 @@ class EpubSerializer(Serializer):
         if current_chapter_messages:
             chapter = self._create_single_chapter(
                 current_chapter_messages,
-                f"第 {chapter_num} 章",
-                f"chapter_{chapter_num}.xhtml"
+                f'第 {chapter_num} 章',
+                f'chapter_{chapter_num}.xhtml'
             )
             chapters.append(chapter)
 
