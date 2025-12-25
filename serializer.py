@@ -37,11 +37,14 @@ class TxtSerializer(Serializer):
 
 
 class EpubSerializer(Serializer):
-    def __init__(self, title: str = "對話記錄", author: str = "Chatlog Tool", max_newlines: int = 2):
+    def __init__(self, title: str = "對話記錄", author: str = "Chatlog Tool", max_newlines: int = 2,
+                 chapter_mode: str = "batch", user_role_prefix: str = "您："):
         super().__init__()
         self.title = title
         self.author = author
         self.max_newlines = max_newlines
+        self.chapter_mode = chapter_mode  # "batch", "per_message", "user_start"
+        self.user_role_prefix = user_role_prefix
 
     def serialize_messages(self, messages: list[Message]) -> bytes:
         # Create EPUB book
@@ -108,66 +111,12 @@ class EpubSerializer(Serializer):
         )
         book.add_item(nav_css)
 
-        # Group messages into chapters (every 50 messages)
-        chapter_size = 50
-        chapters = []
+        # Generate chapters based on selected mode
+        chapters = self._create_chapters(messages)
 
-        for i in range(0, len(messages), chapter_size):
-            chapter_messages = messages[i:i + chapter_size]
-            chapter_num = (i // chapter_size) + 1
-
-            # Generate chapter content
-            chapter_content = f'''<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <title>第 {chapter_num} 章</title>
-    <meta charset="UTF-8"/>
-    <link rel="stylesheet" type="text/css" href="../style/nav.css"/>
-</head>
-<body>
-    <h2>第 {chapter_num} 章</h2>'''
-
-            for msg in chapter_messages:
-                role = html.escape(msg['role'])
-                content = html.escape(msg['content'])
-
-                # Limit consecutive newlines if max_newlines is set
-                if self.max_newlines > 0:
-                    pattern = re.compile(
-                        r'\n{' + str(self.max_newlines + 1) + r',}')
-                    content = pattern.sub('\n' * self.max_newlines, content)
-
-                # Convert newlines to <br> tags
-                content = content.replace('\n', '<br/>')
-
-                # Determine message type for styling
-                css_class = 'message-container'
-                if '您' in role or 'User' in role or '用戶' in role:
-                    css_class += ' user-message'
-                elif 'AI' in role or 'Assistant' in role or '助手' in role:
-                    css_class += ' ai-message'
-                else:
-                    css_class += ' other-message'
-
-                chapter_content += f'''
-    <div class="{css_class}">
-        <div class="role">{role}</div>
-        <div class="content">{content}</div>
-    </div>'''
-
-            chapter_content += '''
-</body>
-</html>'''
-
-            # Create chapter
-            chapter = epub.EpubHtml(
-                title=f'第 {chapter_num} 章',
-                file_name=f'chapter_{chapter_num}.xhtml',
-                lang='zh-TW'
-            )
-            chapter.content = chapter_content
+        # Add chapters to book
+        for chapter in chapters:
             book.add_item(chapter)
-            chapters.append(chapter)
 
         # Create table of contents
         book.toc = (
@@ -192,3 +141,145 @@ class EpubSerializer(Serializer):
         epub_buffer.seek(0)
 
         return epub_buffer.read()
+
+    def _create_chapters(self, messages: list[Message]) -> list:
+        """根據選定的模式創建章節"""
+        if self.chapter_mode == "per_message":
+            return self._create_chapters_per_message(messages)
+        elif self.chapter_mode == "user_start":
+            return self._create_chapters_user_start(messages)
+        else:  # default "batch"
+            return self._create_chapters_batch(messages)
+
+    def _create_chapters_batch(self, messages: list[Message]) -> list:
+        """每50個消息一章（原有邏輯）"""
+        chapter_size = 50
+        chapters = []
+
+        for i in range(0, len(messages), chapter_size):
+            chapter_messages = messages[i:i + chapter_size]
+            chapter_num = (i // chapter_size) + 1
+
+            chapter = self._create_single_chapter(
+                chapter_messages,
+                f"第 {chapter_num} 章",
+                f"chapter_{chapter_num}.xhtml"
+            )
+            chapters.append(chapter)
+
+        return chapters
+
+    def _create_chapters_per_message(self, messages: list[Message]) -> list:
+        """每個消息一章"""
+        chapters = []
+
+        for i, msg in enumerate(messages):
+            chapter_num = i + 1
+            chapter_title = f"對話 {chapter_num}"
+
+            # 如果消息內容太長，截取前20個字符作為標題
+            content_preview = msg['content'][:20].replace('\n', ' ')
+            if len(msg['content']) > 20:
+                content_preview += "..."
+            chapter_title += f": {content_preview}"
+
+            chapter = self._create_single_chapter(
+                [msg],
+                chapter_title,
+                f"message_{chapter_num}.xhtml"
+            )
+            chapters.append(chapter)
+
+        return chapters
+
+    def _create_chapters_user_start(self, messages: list[Message]) -> list:
+        """每當遇到用戶消息時開始新章節"""
+        chapters = []
+        current_chapter_messages = []
+        chapter_num = 1
+
+        for msg in messages:
+            # 檢查是否為用戶消息（開始新章節）
+            if (msg['role'].startswith(self.user_role_prefix) or
+                msg['role'].startswith(self.user_role_prefix.rstrip('：')) or
+                    '您' in msg['role'] or 'User' in msg['role'] or '用戶' in msg['role']):
+
+                # 如果當前章節有內容，先保存
+                if current_chapter_messages:
+                    chapter = self._create_single_chapter(
+                        current_chapter_messages,
+                        f"第 {chapter_num} 章",
+                        f"chapter_{chapter_num}.xhtml"
+                    )
+                    chapters.append(chapter)
+                    chapter_num += 1
+
+                # 開始新章節
+                current_chapter_messages = [msg]
+            else:
+                # 添加到當前章節
+                current_chapter_messages.append(msg)
+
+        # 處理最後一個章節
+        if current_chapter_messages:
+            chapter = self._create_single_chapter(
+                current_chapter_messages,
+                f"第 {chapter_num} 章",
+                f"chapter_{chapter_num}.xhtml"
+            )
+            chapters.append(chapter)
+
+        return chapters
+
+    def _create_single_chapter(self, chapter_messages: list[Message], title: str, filename: str) -> epub.EpubHtml:
+        """創建單個章節"""
+        chapter_content = f'''<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>{html.escape(title)}</title>
+    <meta charset="UTF-8"/>
+    <link rel="stylesheet" type="text/css" href="../style/nav.css"/>
+</head>
+<body>
+    <h2>{html.escape(title)}</h2>'''
+
+        for msg in chapter_messages:
+            role = html.escape(msg['role'])
+            content = html.escape(msg['content'])
+
+            # Limit consecutive newlines if max_newlines is set
+            if self.max_newlines > 0:
+                pattern = re.compile(
+                    r'\n{' + str(self.max_newlines + 1) + r',}')
+                content = pattern.sub('\n' * self.max_newlines, content)
+
+            # Convert newlines to <br> tags
+            content = content.replace('\n', '<br/>')
+
+            # Determine message type for styling
+            css_class = 'message-container'
+            if '您' in role or 'User' in role or '用戶' in role:
+                css_class += ' user-message'
+            elif 'AI' in role or 'Assistant' in role or '助手' in role:
+                css_class += ' ai-message'
+            else:
+                css_class += ' other-message'
+
+            chapter_content += f'''
+    <div class="{css_class}">
+        <div class="role">{role}</div>
+        <div class="content">{content}</div>
+    </div>'''
+
+        chapter_content += '''
+</body>
+</html>'''
+
+        # Create chapter
+        chapter = epub.EpubHtml(
+            title=title,
+            file_name=filename,
+            lang='zh-TW'
+        )
+        chapter.content = chapter_content
+        return chapter

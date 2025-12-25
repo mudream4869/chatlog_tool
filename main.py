@@ -182,20 +182,58 @@ def main():
             help='將連續換行數量限制為最多兩行，以避免過多空白'
         )
 
+        st.markdown('#### 章節分割方式')
+        chapter_mode = st.radio(
+            '選擇章節分割方式',
+            options=['batch', 'per_message', 'user_start'],
+            format_func=lambda x: {
+                'batch': '批次分割 (每50個消息一章)',
+                'per_message': '每個消息一章',
+                'user_start': '用戶消息開始新章節'
+            }[x],
+            help='選擇如何將對話分割成章節'
+        )
+
+        # 如果選擇用戶消息開始新章節，讓用戶指定用戶角色前綴
+        user_role_prefix = "您："
+        if chapter_mode == 'user_start':
+            user_role_prefix = st.text_input(
+                '用戶角色前綴',
+                value='您：',
+                help='用於識別用戶消息的前綴，當遇到此前綴時會開始新章節'
+            )
+
         st.markdown('---')
 
         max_newlines = 2 if epub_max_newlines else 0
         epub_serializer = serializer.EpubSerializer(
             title=epub_title,
             author=epub_author,
-            max_newlines=max_newlines
+            max_newlines=max_newlines,
+            chapter_mode=chapter_mode,
+            user_role_prefix=user_role_prefix
         )
 
         try:
             epub_content = epub_serializer.serialize_messages(msgs)
 
+            # 計算章節數量信息
+            if chapter_mode == 'batch':
+                chapter_count = (len(msgs) + 49) // 50
+                chapter_info = f'分為 {chapter_count} 章 (每章最多50條對話)'
+            elif chapter_mode == 'per_message':
+                chapter_count = len(msgs)
+                chapter_info = f'分為 {chapter_count} 章 (每條對話一章)'
+            else:  # user_start
+                # 計算用戶消息數量來估計章節數
+                user_msg_count = sum(1 for msg in msgs if
+                                     msg['role'].startswith(user_role_prefix) or
+                                     msg['role'].startswith(user_role_prefix.rstrip('：')) or
+                                     '您' in msg['role'] or 'User' in msg['role'] or '用戶' in msg['role'])
+                chapter_info = f'約 {user_msg_count} 章 (用戶消息開始新章節)'
+
             st.success(f'✅ EPUB 電子書生成成功！')
-            st.info(f'📚 包含 {len(msgs)} 條對話，分為 {(len(msgs) + 49) // 50} 章')
+            st.info(f'📚 包含 {len(msgs)} 條對話，{chapter_info}')
 
             timestamp = int(time.time())
             epub_filename = f'dialogue_{timestamp}.epub'
