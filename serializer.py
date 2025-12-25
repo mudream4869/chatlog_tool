@@ -7,7 +7,7 @@ class Serializer:
     def __init__(self):
         pass
 
-    def serialize_messages(self, messages: list[Message]) -> str:
+    def serialize_messages(self, messages: list[Message]) -> bytes | str:
         raise NotImplementedError('Subclasses should implement this method.')
 
 

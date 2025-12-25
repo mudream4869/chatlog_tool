@@ -96,8 +96,8 @@ def main():
 
     tab_original_file_preview, \
         tab_after_cleanup_preview, \
-        tab_export = st.tabs([
-            '檔案預覽', '清理後預覽', '匯出格式'
+        tab_export_txt = st.tabs([
+            '檔案預覽', '清理後預覽', '匯出格式 (txt)'
         ])
 
     def show_message_preview(msgs, k=10):
@@ -128,7 +128,7 @@ def main():
         st.text('清理後前 10 筆對話預覽')
         show_message_preview(msgs, 10)
 
-    with tab_export:
+    with tab_export_txt:
         add_split_lines = st.checkbox(
             '在訊息間加入分隔線', value=True,
             help='在每則訊息之間加入分隔線以增加可讀性')
