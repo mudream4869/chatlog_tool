@@ -143,7 +143,6 @@ class EpubSerializer(Serializer):
         return epub_buffer.read()
 
     def _create_chapters(self, messages: list[Message]) -> list:
-        """根據選定的模式創建章節"""
         if self.chapter_mode == "per_message":
             return self._create_chapters_per_message(messages)
         elif self.chapter_mode == "user_start":
@@ -152,7 +151,6 @@ class EpubSerializer(Serializer):
             return self._create_chapters_batch(messages)
 
     def _create_chapters_batch(self, messages: list[Message]) -> list:
-        """每50個消息一章（原有邏輯）"""
         chapter_size = 50
         chapters = []
 
@@ -170,7 +168,6 @@ class EpubSerializer(Serializer):
         return chapters
 
     def _create_chapters_per_message(self, messages: list[Message]) -> list:
-        """每個消息一章"""
         chapters = []
 
         for i, msg in enumerate(messages):
@@ -193,7 +190,6 @@ class EpubSerializer(Serializer):
         return chapters
 
     def _create_chapters_user_start(self, messages: list[Message]) -> list:
-        """每當遇到用戶消息時開始新章節"""
         chapters = []
         current_chapter_messages = []
         chapter_num = 1
@@ -232,7 +228,6 @@ class EpubSerializer(Serializer):
         return chapters
 
     def _create_single_chapter(self, chapter_messages: list[Message], title: str, filename: str) -> epub.EpubHtml:
-        """創建單個章節"""
         chapter_content = f'''<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
