@@ -248,15 +248,17 @@ class EpubSerializer(Serializer):
 <body>
     <h2>{html.escape(title)}</h2>'''
 
+        newline_limit_pattern = re.compile(
+            r'\n{' + str(self.max_newlines + 1) + r',}')
+
         for msg in chapter_messages:
             role = html.escape(msg['role'])
             content = html.escape(msg['content'])
 
             # Limit consecutive newlines if max_newlines is set
             if self.max_newlines > 0:
-                pattern = re.compile(
-                    r'\n{' + str(self.max_newlines + 1) + r',}')
-                content = pattern.sub('\n' * self.max_newlines, content)
+                content = newline_limit_pattern.sub(
+                    '\n' * self.max_newlines, content)
 
             # Convert newlines to <br> tags
             content = content.replace('\n', '<br/>')
