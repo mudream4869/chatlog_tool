@@ -1,6 +1,8 @@
 import re
 import html
+from io import BytesIO
 from datetime import datetime
+
 from ebooklib import epub
 
 from message import Message
@@ -47,6 +49,21 @@ class EpubSerializer(Serializer):
         self.user_role_prefix = user_role_prefix
 
     def serialize_messages(self, messages: list[Message]) -> bytes:
+        ''' Serialize a list of messages into an in-memory EPUB book.
+        The provided messages are converted into one or more XHTML chapters
+        (according to the configured chapter mode) and packaged as an EPUB
+        document. The resulting EPUB file contents are returned as a bytes
+        object, suitable for writing directly to disk or sending as a binary
+        payload.
+
+        :param messages: Ordered list of Message objects representing the
+            conversation to include in the EPUB.
+        :return: The complete EPUB file content encoded as bytes.
+        :raises Exception: Any exception raised by ``ebooklib.epub`` or the
+            underlying packaging/writing process during EPUB generation is
+            propagated to the caller.
+        '''
+
         # Create EPUB book
         book = epub.EpubBook()
 
@@ -135,7 +152,6 @@ class EpubSerializer(Serializer):
         book.spine = ['cover'] + chapters
 
         # Generate EPUB content as bytes
-        from io import BytesIO
         epub_buffer = BytesIO()
         epub.write_epub(epub_buffer, book, {})
         epub_buffer.seek(0)
@@ -174,7 +190,6 @@ class EpubSerializer(Serializer):
             chapter_num = i + 1
             chapter_title = f"對話 {chapter_num}"
 
-            # 如果消息內容太長，截取前20個字符作為標題
             content_preview = msg['content'][:20].replace('\n', ' ')
             if len(msg['content']) > 20:
                 content_preview += "..."
@@ -195,12 +210,10 @@ class EpubSerializer(Serializer):
         chapter_num = 1
 
         for msg in messages:
-            # 檢查是否為用戶消息（開始新章節）
             if (msg['role'].startswith(self.user_role_prefix) or
                 msg['role'].startswith(self.user_role_prefix.rstrip('：')) or
                     '您' in msg['role'] or 'User' in msg['role'] or '用戶' in msg['role']):
 
-                # 如果當前章節有內容，先保存
                 if current_chapter_messages:
                     chapter = self._create_single_chapter(
                         current_chapter_messages,
@@ -210,13 +223,10 @@ class EpubSerializer(Serializer):
                     chapters.append(chapter)
                     chapter_num += 1
 
-                # 開始新章節
                 current_chapter_messages = [msg]
             else:
-                # 添加到當前章節
                 current_chapter_messages.append(msg)
 
-        # 處理最後一個章節
         if current_chapter_messages:
             chapter = self._create_single_chapter(
                 current_chapter_messages,
