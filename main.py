@@ -96,8 +96,9 @@ def main():
 
     tab_original_file_preview, \
         tab_after_cleanup_preview, \
-        tab_export_txt = st.tabs([
-            '檔案預覽', '清理後預覽', '匯出格式 (txt)'
+        tab_export_txt, \
+        tab_export_epub = st.tabs([
+            '檔案預覽', '清理後預覽', '匯出格式 (txt)', '匯出格式 (epub)'
         ])
 
     def show_message_preview(msgs, k=10):
@@ -158,6 +159,57 @@ def main():
             file_name=filename,
             mime=mime_type
         )
+
+    with tab_export_epub:
+        st.markdown('### EPUB 電子書設定')
+
+        epub_title = st.text_input(
+            '電子書標題',
+            value='對話記錄',
+            help='將顯示在電子書的封面和元數據中'
+        )
+
+        epub_author = st.text_input(
+            '作者名稱',
+            value='Chatlog Tool',
+            help='將顯示在電子書的作者信息中'
+        )
+
+        epub_max_newlines = st.checkbox(
+            '限制連續換行數量至兩行',
+            value=True,
+            key='epub_max_newlines',
+            help='將連續換行數量限制為最多兩行，以避免過多空白'
+        )
+
+        st.markdown('---')
+
+        max_newlines = 2 if epub_max_newlines else 0
+        epub_serializer = serializer.EpubSerializer(
+            title=epub_title,
+            author=epub_author,
+            max_newlines=max_newlines
+        )
+
+        try:
+            epub_content = epub_serializer.serialize_messages(msgs)
+
+            st.success(f'✅ EPUB 電子書生成成功！')
+            st.info(f'📚 包含 {len(msgs)} 條對話，分為 {(len(msgs) + 49) // 50} 章')
+
+            timestamp = int(time.time())
+            epub_filename = f'dialogue_{timestamp}.epub'
+
+            st.download_button(
+                label='📥 下載 EPUB 電子書',
+                data=epub_content,
+                file_name=epub_filename,
+                mime='application/epub+zip'
+            )
+
+        except Exception as e:
+            st.error(f'❌ EPUB 生成失敗：{str(e)}')
+            st.text('請檢查是否已正確安裝相關依賴套件。')
 
 
 main()
