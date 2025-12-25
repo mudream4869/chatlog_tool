@@ -137,9 +137,9 @@ class EpubSerializer(Serializer):
 
         # Create table of contents
         book.toc = (
-            epub.Link("cover.xhtml", "封面", "cover"),
+            epub.Link('cover.xhtml', '封面', 'cover'),
             (
-                epub.Section("對話內容"),
+                epub.Section('對話內容'),
                 tuple(chapters)
             )
         )
