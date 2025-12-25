@@ -192,7 +192,7 @@ class EpubSerializer(Serializer):
 
             content_preview = msg['content'][:20].replace('\n', ' ')
             if len(msg['content']) > 20:
-                content_preview += "..."
+                content_preview += '...'
             chapter_title += f': {content_preview}'
 
             chapter = self._create_single_chapter(
