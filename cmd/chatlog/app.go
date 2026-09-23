@@ -149,10 +149,10 @@ func overview(c *tgframe.Container, name string, msgs, cleaned []chatlog.Message
 func preview(c *tgframe.Container, id string, msgs []chatlog.Message) {
 	maxN := max(1, min(len(msgs), 50))
 	n := tgcomp.Slider(c, "預覽筆數", &tgcomp.SliderConf[int]{
-		Base:    tgcomp.Base{ID: "preview_" + id},
-		Default: ptr(min(10, maxN)),
-		Min:     ptr(1),
-		Max:     ptr(maxN),
+		ID:      "preview_" + id,
+		Default: new(min(10, maxN)),
+		Min:     new(1),
+		Max:     new(maxN),
 	})
 	for _, m := range msgs[:min(n, len(msgs))] {
 		box := tgcomp.Box(c)
@@ -177,10 +177,10 @@ func timestamp() string {
 
 func exportTxt(c *tgframe.Container, msgs []chatlog.Message) {
 	split := tgcomp.Checkbox(c, "在訊息間加入分隔線", &tgcomp.CheckboxConf{
-		Base: tgcomp.Base{ID: "txt_split"}, Default: true,
+		ID: "txt_split", Default: true,
 	})
 	limit := tgcomp.Checkbox(c, "限制連續換行數量至兩行", &tgcomp.CheckboxConf{
-		Base: tgcomp.Base{ID: "txt_limit"}, Default: true,
+		ID: "txt_limit", Default: true,
 	})
 
 	opt := chatlog.TxtOptions{SplitLines: split}
@@ -216,7 +216,7 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message) {
 		UserPrefix: "您：",
 	}
 	if tgcomp.Checkbox(c, "限制連續換行數量至兩行", &tgcomp.CheckboxConf{
-		Base: tgcomp.Base{ID: "epub_limit"}, Default: true,
+		ID: "epub_limit", Default: true,
 	}) {
 		opt.MaxNewlines = 2
 	}
@@ -246,5 +246,3 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message) {
 		MIME:     "application/epub+zip",
 	})
 }
-
-func ptr[T any](v T) *T { return &v }
