@@ -25,10 +25,12 @@ const intro = `這個工具可以幫你把對話紀錄（尤其是 AI RPG 對話
 func newApp() *tgframe.App {
 	app := tgframe.NewApp()
 	app.SetTitle("對話整理器")
-	// No page Emoji: toolgui v0.7.2's wasm index.html has no <link rel="icon">,
-	// and setting one crashes the frontend.
-	app.AddPage("index", "對話整理器", MainPage)
-	app.AddPage("source", "原始碼", SourcePage)
+	app.AddPageByConfig(&tgframe.PageConfig{
+		Name: "index", Title: "對話整理器", Emoji: "💬",
+	}, MainPage)
+	app.AddPageByConfig(&tgframe.PageConfig{
+		Name: "source", Title: "原始碼", Emoji: "📜",
+	}, SourcePage)
 	return app
 }
 
@@ -157,17 +159,7 @@ func preview(c *tgframe.Container, id string, msgs []chatlog.Message) {
 	for _, m := range msgs[:min(n, len(msgs))] {
 		box := tgcomp.Box(c)
 		tgcomp.Badge(box, m.Role)
-		multilineText(box, m.Content)
-	}
-}
-
-// multilineText keeps line breaks: toolgui's Text collapses them.
-func multilineText(c *tgframe.Container, s string) {
-	for line := range strings.SplitSeq(s, "\n") {
-		if line == "" {
-			line = "\u00a0" // keep blank lines' height
-		}
-		tgcomp.Text(c, line)
+		tgcomp.Text(box, m.Content)
 	}
 }
 
@@ -221,9 +213,8 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message) {
 		opt.MaxNewlines = 2
 	}
 
-	// Select rather than Radio: toolgui's Radio doesn't show its label.
-	mode := tgcomp.Select(c, "章節分割方式", chapterModes,
-		(&tgcomp.SelectConf{}).SetDefault(0))
+	mode := tgcomp.Radio(c, "章節分割方式", chapterModes,
+		(&tgcomp.RadioConf{}).SetDefault(0))
 	if mode != nil {
 		opt.Mode = chatlog.ChapterMode(*mode)
 	}
@@ -233,15 +224,11 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message) {
 	}
 	tgcomp.Divider(c)
 
-	book, err := chatlog.ToEpub(msgs, opt)
-	if err != nil {
-		tgcomp.MessageDanger(c, err.Error(), &tgcomp.MessageConf{Title: "EPUB 生成失敗"})
-		return
-	}
-
 	chapters := len(chatlog.Chapters(msgs, opt))
 	tgcomp.MessageInfo(c, fmt.Sprintf("📚 包含 %d 則對話，分為 %d 章。", len(msgs), chapters))
-	tgcomp.DownloadFile(c, "📥 下載 EPUB 電子書", book, &tgcomp.DownloadFileConf{
+	// Build the EPUB only on click, not on every rerun.
+	gen := func() ([]byte, error) { return chatlog.ToEpub(msgs, opt) }
+	tgcomp.DownloadFileFunc(c, "📥 下載 EPUB 電子書", gen, &tgcomp.DownloadFileConf{
 		Filename: "dialogue_" + timestamp() + ".epub",
 		MIME:     "application/epub+zip",
 	})
