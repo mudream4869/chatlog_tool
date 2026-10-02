@@ -15,9 +15,6 @@ import (
 //go:embed sample.txt
 var sampleLog []byte
 
-//go:embed app.go
-var appSource string
-
 const intro = `這個工具可以幫你把對話紀錄（尤其是 AI RPG 對話）整理成易讀、易分享的格式。
 
 所有處理都在瀏覽器裡完成，檔案不會上傳到任何伺服器。`
@@ -28,18 +25,7 @@ func newApp() *tgframe.App {
 	app.AddPageByConfig(&tgframe.PageConfig{
 		Name: "index", Title: "對話整理器", Emoji: "💬",
 	}, MainPage)
-	app.AddPageByConfig(&tgframe.PageConfig{
-		Name: "source", Title: "原始碼", Emoji: "📜",
-	}, SourcePage)
 	return app
-}
-
-func SourcePage(p *tgframe.Params) error {
-	tgcomp.Title(p.Main, "原始碼")
-	tgcomp.Markdown(p.Main, "這個頁面用 [ToolGUI](https://github.com/voilelab/toolgui) 寫成，"+
-		"以下是 UI 的完整程式碼。")
-	tgcomp.Code(p.Main, appSource)
-	return nil
 }
 
 type settings struct {
