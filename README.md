@@ -15,6 +15,7 @@
 - 📝 匯出為純文字或 EPUB 電子書
 - 🔍 預覽原始和清理後的內容
 - 🧪 內建範例對話，不用準備檔案就能試用
+- 📴 載入過一次後可離線使用
 
 ## 使用方式
 
@@ -29,7 +30,7 @@ go run ./cmd/chatlog
 go tool toolgui-wasm serve ./cmd/chatlog
 
 # 產生靜態網站到 dist/
-go tool toolgui-wasm build -o dist ./cmd/chatlog
+go tool toolgui-wasm build -offline -o dist ./cmd/chatlog
 ```
 
 推送到 `main` 時，GitHub Actions 會自動建置並部署到 GitHub Pages（需在 repo 設定中將 Pages 來源設為 GitHub Actions）。

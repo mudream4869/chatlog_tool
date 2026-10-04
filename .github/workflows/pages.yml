@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go tool toolgui-wasm build -o dist ./cmd/chatlog
+      - run: go tool toolgui-wasm build -offline -o dist ./cmd/chatlog
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
