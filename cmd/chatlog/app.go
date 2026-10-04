@@ -22,6 +22,7 @@ const intro = `這個工具可以幫你把對話紀錄（尤其是 AI RPG 對話
 func newApp() *tgframe.App {
 	app := tgframe.NewApp()
 	app.SetTitle("對話整理器")
+	app.SetIcon("assets/favicon.ico")
 	app.AddPageByConfig(&tgframe.PageConfig{
 		Name: "index", Title: "對話整理器", Emoji: "💬",
 	}, MainPage)
