@@ -143,9 +143,7 @@ func preview(c *tgframe.Container, id string, msgs []chatlog.Message) {
 		Max:     new(maxN),
 	})
 	for _, m := range msgs[:min(n, len(msgs))] {
-		box := tgcomp.Box(c)
-		tgcomp.Badge(box, m.Role)
-		tgcomp.Text(box, m.Content)
+		tgcomp.Text(tgcomp.ChatMessage(c, m.Role), m.Content)
 	}
 }
 
