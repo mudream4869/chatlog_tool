@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -37,9 +38,9 @@ func TestParseText(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Message{
-		{"您", "你好！"},
-		{"AI", "嗨\n第二行"},
-		{"您", "再見"},
+		{Role: "您", Content: "你好！"},
+		{Role: "AI", Content: "嗨\n第二行"},
+		{Role: "您", Content: "再見"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v", got)
@@ -76,7 +77,7 @@ func TestFilters(t *testing.T) {
 }
 
 func TestApplyKeepsInput(t *testing.T) {
-	in := []Message{{"AI", "<b>x</b>"}}
+	in := []Message{{Role: "AI", Content: "<b>x</b>"}}
 	out := Apply(in, RemoveHTMLTags)
 	if out[0].Content != "x" || in[0].Content != "<b>x</b>" {
 		t.Errorf("in %q out %q", in[0].Content, out[0].Content)
@@ -84,7 +85,7 @@ func TestApplyKeepsInput(t *testing.T) {
 }
 
 func TestToTxt(t *testing.T) {
-	msgs := []Message{{"您", "a\n\n\n\nb"}, {"AI", "c"}}
+	msgs := []Message{{Role: "您", Content: "a\n\n\n\nb"}, {Role: "AI", Content: "c"}}
 	got := ToTxt(msgs, TxtOptions{MaxNewlines: 2, SplitLines: true})
 	want := "您：\na\n\nb\n\n---\n\nAI：\nc\n\n---"
 	if got != want {
@@ -93,7 +94,7 @@ func TestToTxt(t *testing.T) {
 }
 
 func TestCountRoles(t *testing.T) {
-	msgs := []Message{{"您", ""}, {"AI", ""}, {"您", ""}}
+	msgs := []Message{{Role: "您", Content: ""}, {Role: "AI", Content: ""}, {Role: "您", Content: ""}}
 	want := []RoleCount{{"您", 2}, {"AI", 1}}
 	if got := CountRoles(msgs); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v", got)
@@ -107,7 +108,7 @@ func TestChapters(t *testing.T) {
 		if i%3 == 0 {
 			role = "您"
 		}
-		msgs = append(msgs, Message{role, strings.Repeat("字", 25)})
+		msgs = append(msgs, Message{Role: role, Content: strings.Repeat("字", 25)})
 	}
 
 	if n := len(Chapters(msgs, EpubOptions{Mode: ChapterBatch})); n != 3 {
@@ -123,7 +124,7 @@ func TestChapters(t *testing.T) {
 }
 
 func TestToEpub(t *testing.T) {
-	msgs := []Message{{"您", "<hi> & bye"}, {"AI", "a\nb"}}
+	msgs := []Message{{Role: "您", Content: "<hi> & bye"}, {Role: "AI", Content: "a\nb"}}
 	b, err := ToEpub(msgs, EpubOptions{
 		Title: "T&T", Author: "me", Now: time.Unix(0, 0),
 	})
@@ -170,5 +171,46 @@ func TestToEpub(t *testing.T) {
 		if !strings.Contains(ch, s) {
 			t.Errorf("chapter missing %q", s)
 		}
+	}
+}
+
+const stSample = `{"chat_metadata":{"integrity":"x"},"user_name":"unused","character_name":"unused"}
+{"name":"Seraphina","is_user":false,"is_system":false,"mes":"*Hi.*","swipes":["*Hi.*"],"swipe_id":0}
+{"name":"帕秋莉","is_user":true,"is_system":false,"mes":" hello? ","extra":{}}
+{"name":"Seraphina","is_user":false,"mes":""}
+`
+
+func TestParseSillyTavern(t *testing.T) {
+	got, err := ParseSillyTavern(strings.ReplaceAll(stSample, "\n", "\r\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Message{
+		{Role: "Seraphina", Content: "*Hi.*"},
+		{Role: "帕秋莉", Content: "hello?", IsUser: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v", got)
+	}
+
+	for _, in := range []string{"您：你好", `{"chat_metadata":{}}`, `{"name":"a"}`} {
+		if _, err := ParseSillyTavern(in); !errors.Is(err, ErrNotSillyTavern) {
+			t.Errorf("%q: want ErrNotSillyTavern, got %v", in, err)
+		}
+	}
+}
+
+func TestIsSillyTavernFile(t *testing.T) {
+	for name, want := range map[string]bool{"a.jsonl": true, "A.JSONL": true, "a.txt": false, "jsonl": false} {
+		if got := IsSillyTavernFile(name); got != want {
+			t.Errorf("%s: got %v", name, got)
+		}
+	}
+}
+
+func TestChaptersIsUser(t *testing.T) {
+	msgs := []Message{{Role: "帕秋莉", IsUser: true}, {Role: "S"}, {Role: "帕秋莉", IsUser: true}}
+	if n := len(Chapters(msgs, EpubOptions{Mode: ChapterUserStart})); n != 2 {
+		t.Errorf("got %d chapters", n)
 	}
 }

@@ -72,7 +72,7 @@ func Chapters(msgs []Message, opt EpubOptions) []Chapter {
 	case ChapterUserStart:
 		var cur []Message
 		for _, m := range msgs {
-			if IsUserRole(m.Role, opt.UserPrefix) && len(cur) > 0 {
+			if (m.IsUser || IsUserRole(m.Role, opt.UserPrefix)) && len(cur) > 0 {
 				add(cur)
 				cur = nil
 			}
@@ -260,7 +260,7 @@ func chapterXHTML(ch Chapter, opt EpubOptions) string {
 
 		class := "other-message"
 		switch {
-		case IsUserRole(m.Role, opt.UserPrefix):
+		case m.IsUser || IsUserRole(m.Role, opt.UserPrefix):
 			class = "user-message"
 		case strings.Contains(m.Role, "AI") ||
 			strings.Contains(m.Role, "Assistant") ||

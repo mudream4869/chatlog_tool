@@ -7,6 +7,7 @@ import "strings"
 type Message struct {
 	Role    string
 	Content string
+	IsUser  bool // known user side, e.g. SillyTavern is_user
 }
 
 // IsUserRole reports whether role belongs to the user side. Roles have their
