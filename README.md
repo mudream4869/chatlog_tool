@@ -4,7 +4,7 @@
 
 以 [ToolGUI](https://github.com/voilelab/toolgui) 寫成，可編譯成 WebAssembly 在瀏覽器中執行，檔案不會離開你的電腦。
 
-**線上使用：<https://mudream4869.github.io/chatlog_tool/>**
+**線上使用：<https://chatlog-tool.mukyu.work/>**
 
 ## 功能
 
