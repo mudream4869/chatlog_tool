@@ -35,14 +35,20 @@ type settings struct {
 }
 
 func sidebar(c *tgframe.Container) (*tgcomp.FileObject, bool, settings) {
-	file := tgcomp.FileUpload(c, "上傳對話紀錄檔案", ".txt,text/plain")
+	file := tgcomp.FileUpload(c, "上傳對話紀錄檔案", ".txt,.jsonl,text/plain")
+	tgcomp.Caption(c, "支援純文字對話（.txt）與 SillyTavern 聊天紀錄（.jsonl）。")
 	useSample := tgcomp.Toggle(c, "沒有檔案？使用範例對話")
 	tgcomp.Divider(c)
 
 	tgcomp.Subtitle(c, "角色設定")
-	prefixes := tgcomp.Textarea(c, "角色前綴（每行一個）",
-		&tgcomp.TextareaConf{Default: "您：\nAI："})
-	tgcomp.Caption(c, "用於辨識對話中不同角色的前綴字串，前綴的最後一個字元需為冒號。")
+	var prefixes string
+	if file != nil && chatlog.IsSillyTavernFile(file.Name) {
+		tgcomp.Caption(c, "SillyTavern 聊天紀錄（.jsonl）會直接使用檔案中的角色名稱，不需設定角色前綴。")
+	} else {
+		prefixes = tgcomp.Textarea(c, "角色前綴（每行一個）",
+			&tgcomp.TextareaConf{Default: "您：\nAI："})
+		tgcomp.Caption(c, "用於辨識對話中不同角色的前綴字串，前綴的最後一個字元需為冒號。")
+	}
 	tgcomp.Divider(c)
 
 	tgcomp.Subtitle(c, "清理選項")
@@ -74,6 +80,7 @@ func MainPage(p *tgframe.Params) error {
 	var (
 		raw  []byte
 		name string
+		st   bool // SillyTavern .jsonl
 	)
 	switch {
 	case file != nil:
@@ -82,18 +89,33 @@ func MainPage(p *tgframe.Params) error {
 			return err
 		}
 		raw, name = b, file.Name
+		st = chatlog.IsSillyTavernFile(file.Name)
 	case useSample:
 		raw, name = sampleLog, "範例對話"
 	default:
-		tgcomp.MessageWarning(p.Main, "請在左側上傳一個對話紀錄檔案（.txt），或開啟「使用範例對話」。")
+		tgcomp.MessageWarning(p.Main, "請在左側上傳一個對話紀錄檔案（.txt 或 SillyTavern .jsonl），或開啟「使用範例對話」。")
 		return nil
 	}
 
-	msgs, err := chatlog.ParseText(chatlog.Decode(raw), s.prefixes)
-	if err != nil {
-		tgcomp.MessageDanger(p.Main, err.Error()+"，請確認角色前綴設定。",
-			&tgcomp.MessageConf{Title: "無法辨識對話格式"})
-		return nil
+	var (
+		msgs []chatlog.Message
+		err  error
+	)
+	if st {
+		msgs, err = chatlog.ParseSillyTavern(chatlog.Decode(raw))
+		if err != nil {
+			tgcomp.MessageDanger(p.Main, err.Error()+"。目前 .jsonl 只支援 SillyTavern 匯出的聊天紀錄。",
+				&tgcomp.MessageConf{Title: "無法辨識對話格式"})
+			return nil
+		}
+		tgcomp.MessageInfo(p.Main, "已依 SillyTavern 聊天紀錄（.jsonl）格式讀取。")
+	} else {
+		msgs, err = chatlog.ParseText(chatlog.Decode(raw), s.prefixes)
+		if err != nil {
+			tgcomp.MessageDanger(p.Main, err.Error()+"，請確認角色前綴設定。",
+				&tgcomp.MessageConf{Title: "無法辨識對話格式"})
+			return nil
+		}
 	}
 	cleaned := chatlog.Apply(msgs, s.filters...)
 
@@ -105,7 +127,7 @@ func MainPage(p *tgframe.Params) error {
 	preview(tabs[0], "raw", msgs)
 	preview(tabs[1], "cleaned", cleaned)
 	exportTxt(tabs[2], cleaned)
-	exportEpub(tabs[3], cleaned)
+	exportEpub(tabs[3], cleaned, st)
 	return nil
 }
 
@@ -183,7 +205,7 @@ var chapterModes = []string{
 	"用戶訊息開始新章節",
 }
 
-func exportEpub(c *tgframe.Container, msgs []chatlog.Message) {
+func exportEpub(c *tgframe.Container, msgs []chatlog.Message, st bool) {
 	tgcomp.Subtitle(c, "EPUB 電子書設定")
 
 	c1, c2 := tgcomp.EqColumn2(c)
@@ -203,9 +225,17 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message) {
 	if mode != nil {
 		opt.Mode = chatlog.ChapterMode(*mode)
 	}
+	if st {
+		// Users are marked by is_user, not by prefix.
+		opt.UserPrefix = ""
+	}
 	if opt.Mode == chatlog.ChapterUserStart {
-		opt.UserPrefix = tgcomp.Textbox(c, "用戶角色前綴", &tgcomp.TextboxConf{Default: "您："})
-		tgcomp.Caption(c, "遇到此前綴（或含「您」「User」「用戶」）的訊息時開始新章節。")
+		if st {
+			tgcomp.Caption(c, "依 SillyTavern 紀錄中標記為用戶（is_user）的訊息開始新章節。")
+		} else {
+			opt.UserPrefix = tgcomp.Textbox(c, "用戶角色前綴", &tgcomp.TextboxConf{Default: "您："})
+			tgcomp.Caption(c, "遇到此前綴（或含「您」「User」「用戶」）的訊息時開始新章節。")
+		}
 	}
 	tgcomp.Divider(c)
 

@@ -48,3 +48,25 @@ func TestMainPageBadPrefix(t *testing.T) {
 		t.Error("no parse error shown")
 	}
 }
+
+func TestMainPageSillyTavern(t *testing.T) {
+	p := tgtest.Open(t, newApp(), "index")
+	p.GetByLabel("上傳對話紀錄檔案").Upload("chat.jsonl", []byte(
+		`{"chat_metadata":{}}`+"\n"+
+			`{"name":"Seraphina","is_user":false,"mes":"Hi"}`+"\n"+
+			`{"name":"帕秋莉","is_user":true,"mes":"hello?"}`+"\n"))
+	if err := p.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !p.HasText("SillyTavern 聊天紀錄（.jsonl）") || !p.HasText("共 2 筆訊息") {
+		t.Error("SillyTavern jsonl not parsed")
+	}
+}
+
+func TestMainPageBadJSONL(t *testing.T) {
+	p := tgtest.Open(t, newApp(), "index")
+	p.GetByLabel("上傳對話紀錄檔案").Upload("data.jsonl", []byte(`{"messages":[]}`+"\n"))
+	if !p.HasText("不是 SillyTavern 聊天紀錄") {
+		t.Error("no SillyTavern format error shown")
+	}
+}
