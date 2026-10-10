@@ -93,6 +93,7 @@ func MainPage(p *tgframe.Params) error {
 	case useSample:
 		raw, name = sampleLog, "範例對話"
 	default:
+		p.State.Delete(loadedKey)
 		tgcomp.MessageWarning(p.Main, "請在左側上傳一個對話紀錄檔案（.txt 或 SillyTavern .jsonl），或開啟「使用範例對話」。")
 		return nil
 	}
@@ -108,7 +109,6 @@ func MainPage(p *tgframe.Params) error {
 				&tgcomp.MessageConf{Title: "無法辨識對話格式"})
 			return nil
 		}
-		tgcomp.MessageInfo(p.Main, "已依 SillyTavern 聊天紀錄（.jsonl）格式讀取。")
 	} else {
 		msgs, err = chatlog.ParseText(chatlog.Decode(raw), s.prefixes)
 		if err != nil {
@@ -119,6 +119,7 @@ func MainPage(p *tgframe.Params) error {
 	}
 	cleaned := chatlog.Apply(msgs, s.filters...)
 
+	toastLoaded(p, name, len(raw), len(msgs), st)
 	overview(p.Main, name, msgs, cleaned)
 
 	tabs := tgcomp.Tab(p.Main, []string{
@@ -131,8 +132,24 @@ func MainPage(p *tgframe.Params) error {
 	return nil
 }
 
+const loadedKey = "chatlog.loaded"
+
+// toastLoaded toasts only when the source changes, not on every rerun.
+func toastLoaded(p *tgframe.Params, name string, size, n int, st bool) {
+	key := fmt.Sprintf("%s/%d", name, size)
+	if last, _ := p.State.Get[string](loadedKey); last == key {
+		return
+	}
+	p.State.Set(loadedKey, key)
+	text := fmt.Sprintf("成功載入「%s」，共 %d 筆訊息。", name, n)
+	if st {
+		text = "已依 SillyTavern 聊天紀錄（.jsonl）格式" + text
+	}
+	tgcomp.Toast(p.Main, text, &tgcomp.ToastConf{Icon: "✅"})
+}
+
 func overview(c *tgframe.Container, name string, msgs, cleaned []chatlog.Message) {
-	tgcomp.MessageSuccess(c, fmt.Sprintf("成功載入「%s」，共 %d 筆訊息。", name, len(msgs)))
+	tgcomp.Caption(c, fmt.Sprintf("目前檔案：%s", name))
 
 	roles := chatlog.CountRoles(msgs)
 	before, after := chatlog.CountRunes(msgs), chatlog.CountRunes(cleaned)
@@ -188,10 +205,12 @@ func exportTxt(c *tgframe.Container, msgs []chatlog.Message) {
 	tgcomp.Code(exp, strings.Join(lines[:min(100, len(lines))], "\n"),
 		&tgcomp.CodeConf{Language: "text"})
 
-	tgcomp.DownloadFile(c, "📥 下載整理後的 txt 檔案", []byte(out), &tgcomp.DownloadFileConf{
+	if tgcomp.DownloadFile(c, "📥 下載整理後的 txt 檔案", []byte(out), &tgcomp.DownloadFileConf{
 		Filename: "dialogue_" + timestamp() + ".txt",
 		MIME:     "text/plain",
-	})
+	}) {
+		tgcomp.Toast(c, "已下載 TXT 檔案", &tgcomp.ToastConf{Icon: "📄"})
+	}
 }
 
 var chapterModes = []string{
@@ -235,9 +254,17 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message, st bool) {
 	chapters := len(chatlog.Chapters(msgs, opt))
 	tgcomp.MessageInfo(c, fmt.Sprintf("📚 包含 %d 則對話，分為 %d 章。", len(msgs), chapters))
 	// Build the EPUB only on click, not on every rerun.
-	gen := func() ([]byte, error) { return chatlog.ToEpub(msgs, opt) }
-	tgcomp.DownloadFileFunc(c, "📥 下載 EPUB 電子書", gen, &tgcomp.DownloadFileConf{
+	var genErr error
+	gen := func() ([]byte, error) {
+		b, err := chatlog.ToEpub(msgs, opt)
+		genErr = err
+		return b, err
+	}
+	// gen's error is already shown under the button.
+	if tgcomp.DownloadFileFunc(c, "📥 下載 EPUB 電子書", gen, &tgcomp.DownloadFileConf{
 		Filename: "dialogue_" + timestamp() + ".epub",
 		MIME:     "application/epub+zip",
-	})
+	}) && genErr == nil {
+		tgcomp.Toast(c, fmt.Sprintf("已產生 EPUB 電子書（%d 章）", chapters), &tgcomp.ToastConf{Icon: "📚"})
+	}
 }
