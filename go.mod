@@ -3,7 +3,7 @@ module github.com/mudream4869/chatlog_tool
 go 1.27.2
 
 require (
-	github.com/voilelab/toolgui v0.14.0
+	github.com/voilelab/toolgui v0.15.0
 	golang.org/x/text v0.42.0
 )
 
