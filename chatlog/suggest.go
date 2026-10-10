@@ -82,6 +82,7 @@ func prefixOf(line string) (string, bool) {
 }
 
 func validLabel(rs []rune) bool {
+	rs = []rune(unwrap(string(rs))) // "[AI]"
 	if len(rs) == 0 || unicode.IsSpace(rs[0]) || unicode.IsSpace(rs[len(rs)-1]) {
 		return false
 	}

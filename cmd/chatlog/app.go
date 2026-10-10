@@ -246,8 +246,21 @@ func preview(c *tgframe.Container, msgs []chatlog.Message) {
 		Max:     new(maxN),
 	})
 	for _, m := range msgs[:min(n, len(msgs))] {
-		tgcomp.Text(tgcomp.ChatMessage(c, m.Role), m.Content)
+		tgcomp.Text(tgcomp.ChatMessage(c, m.Role, &tgcomp.ChatMessageConf{Avatar: avatar(m)}), m.Content)
 	}
+}
+
+// avatar gives user-side roles such as "您" a user icon; "" keeps toolgui's
+// default (its own icons for user/assistant, else the first letter).
+func avatar(m chatlog.Message) string {
+	switch strings.ToLower(m.Role) {
+	case "user", "human":
+		return ""
+	}
+	if m.IsUser || chatlog.IsUserRole(m.Role, "") {
+		return "🧑"
+	}
+	return ""
 }
 
 func timestamp() string {

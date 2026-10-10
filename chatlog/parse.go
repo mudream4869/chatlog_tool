@@ -15,8 +15,8 @@ var DefaultRolePrefixes = []string{
 var ErrNoMessage = errors.New("找不到任何符合角色前綴的訊息")
 
 // ParseText splits content into messages. A message starts at a line
-// beginning with one of prefixes; the role is the prefix minus its last
-// character (the colon). Text before the first message is dropped.
+// beginning with one of prefixes; the role is RoleOf the prefix. Text before
+// the first message is dropped.
 func ParseText(content string, prefixes []string) ([]Message, error) {
 	if len(prefixes) == 0 {
 		prefixes = DefaultRolePrefixes
@@ -44,8 +44,7 @@ func ParseText(content string, prefixes []string) ([]Message, error) {
 				continue
 			}
 			flush()
-			r := []rune(p)
-			role = string(r[:len(r)-1])
+			role = RoleOf(p)
 			buf = []string{strings.TrimSpace(line[len(p):])}
 			matched = true
 			break
@@ -60,6 +59,28 @@ func ParseText(content string, prefixes []string) ([]Message, error) {
 		return nil, ErrNoMessage
 	}
 	return msgs, nil
+}
+
+// brackets may wrap a role name, e.g. "[AI]:".
+var brackets = [][2]string{{"[", "]"}, {"【", "】"}}
+
+// RoleOf returns the role of a prefix: minus its last character (the colon)
+// and any wrapping brackets.
+func RoleOf(prefix string) string {
+	r := []rune(prefix)
+	return unwrap(string(r[:max(0, len(r)-1)]))
+}
+
+// unwrap strips one pair of wrapping brackets.
+func unwrap(s string) string {
+	for _, b := range brackets {
+		if in, ok := strings.CutPrefix(s, b[0]); ok {
+			if in, ok := strings.CutSuffix(in, b[1]); ok && in != "" {
+				return in
+			}
+		}
+	}
+	return s
 }
 
 // ParsePrefixes reads one prefix per non-empty line.

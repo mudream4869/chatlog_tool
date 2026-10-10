@@ -117,3 +117,23 @@ func TestMainPageBadPrefixRawPreview(t *testing.T) {
 		t.Error("no raw preview or detection hint on parse error")
 	}
 }
+
+func TestMainPageBracketRoles(t *testing.T) {
+	p := tgtest.Open(t, newApp(), "index")
+	p.GetByLabel("上傳對話紀錄檔案").Upload("log.txt", []byte("[USER]: 你好\n[AI]:\n嗨\n[USER]: 走吧\n[AI]: 好\n"))
+	if err := p.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !p.HasText("共 4 筆訊息") {
+		t.Fatal("bracket prefixes not detected")
+	}
+	nodes := p.FindByName("chat_message_component")
+	if len(nodes) == 0 {
+		t.Fatal("no chat messages")
+	}
+	for _, n := range nodes {
+		if k := n.String("kind"); k != "user" && k != "assistant" {
+			t.Errorf("role %q drawn as %q", n.String("role"), k)
+		}
+	}
+}

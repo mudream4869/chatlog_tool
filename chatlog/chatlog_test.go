@@ -246,3 +246,28 @@ func TestLikelyPrefixes(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestBracketPrefixes(t *testing.T) {
+	in := "[USER]: 你好\n[AI]:\n嗨\n[USER]: 再見\n[AI]: 掰\n【旁白】：1\n【旁白】：2\n"
+	var got []string
+	for _, s := range SuggestPrefixes(in) {
+		got = append(got, s.Prefix)
+	}
+	if want := []string{"[USER]:", "[AI]:", "【旁白】："}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q", got)
+	}
+
+	msgs, err := ParseText(in, got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msgs[0].Role != "USER" || msgs[1].Role != "AI" || msgs[1].Content != "嗨" || msgs[4].Role != "旁白" {
+		t.Errorf("got %#v", msgs)
+	}
+	if !IsUserRole("USER", "") || !IsUserRole("玩家", "[玩家]:") || IsUserRole("AI", "[USER]:") {
+		t.Error("IsUserRole")
+	}
+	if RoleOf("[]:") != "[]" || RoleOf("您：") != "您" {
+		t.Error("RoleOf")
+	}
+}
