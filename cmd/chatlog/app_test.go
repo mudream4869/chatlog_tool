@@ -98,3 +98,22 @@ func TestMainPageToast(t *testing.T) {
 		t.Error("no download toast")
 	}
 }
+
+func TestMainPageDetectPrefix(t *testing.T) {
+	p := tgtest.Open(t, newApp(), "index")
+	p.GetByLabel("上傳對話紀錄檔案").Upload("log.txt", []byte("玩家：你好\nGM：嗨\n玩家：走吧\nGM：好\n"))
+	if err := p.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !p.HasText("共 4 筆訊息") || !p.HasText("自動偵測角色前綴") {
+		t.Error("prefixes not detected")
+	}
+}
+
+func TestMainPageBadPrefixRawPreview(t *testing.T) {
+	p := tgtest.Open(t, newApp(), "index")
+	p.GetByLabel("上傳對話紀錄檔案").Upload("log.txt", []byte("hello\nworld\n"))
+	if !p.HasText("原始文字") || !p.HasText("偵測不到角色前綴") {
+		t.Error("no raw preview or detection hint on parse error")
+	}
+}

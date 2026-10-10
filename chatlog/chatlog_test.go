@@ -214,3 +214,35 @@ func TestChaptersIsUser(t *testing.T) {
 		t.Errorf("got %d chapters", n)
 	}
 }
+
+func TestSuggestPrefixes(t *testing.T) {
+	in := "說明：前言\r\n" +
+		"玩家：你好\nGM：歡迎\n內容 12:30\nhttp://x.y\n" +
+		"玩家：走吧\nGM：好\n他說：「嗯。」\n他說：「嗯。」\n" +
+		"玩家：再見\nGM：再見\n 縮排：不算\n 縮排：不算\n"
+	sugs := SuggestPrefixes(in)
+	var got []string
+	for _, s := range sugs {
+		got = append(got, s.Prefix)
+	}
+	// "說明" appears once; "他說" lines are kept since the label itself is clean.
+	if want := []string{"玩家：", "GM：", "他說："}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if sugs[0].Count != 3 || sugs[0].Samples[0] != "玩家：你好" {
+		t.Errorf("got %+v", sugs[0])
+	}
+	if got := LikelyPrefixes(sugs); len(got) != 3 {
+		t.Errorf("likely: got %q", got)
+	}
+	if got := SuggestPrefixes("12:30 起床\n12:31 刷牙\nnote http://a\nnote http://b"); len(got) != 0 {
+		t.Errorf("got %+v", got)
+	}
+}
+
+func TestLikelyPrefixes(t *testing.T) {
+	sugs := []PrefixSuggestion{{Prefix: "您：", Count: 20}, {Prefix: "AI：", Count: 19}, {Prefix: "HP：", Count: 2}}
+	if got := LikelyPrefixes(sugs); !reflect.DeepEqual(got, []string{"您：", "AI："}) {
+		t.Errorf("got %q", got)
+	}
+}
