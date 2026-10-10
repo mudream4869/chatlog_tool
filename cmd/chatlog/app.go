@@ -125,14 +125,19 @@ func prefixSuggestions(c *tgframe.Container, sugs []chatlog.PrefixSuggestion) {
 	exp := tgcomp.Expand(c, "偵測到的角色前綴", false)
 	rows := make([][]tgcomp.Cell, len(sugs))
 	for i, s := range sugs {
+		note := ""
+		if s.Field {
+			note = "疑似狀態欄位"
+		}
 		rows[i] = []tgcomp.Cell{tgcomp.TextCell(s.Prefix), tgcomp.NumberCell(float64(s.Count)),
-			tgcomp.TextCell(strings.Join(s.Samples, " / "))}
+			tgcomp.TextCell(note), tgcomp.TextCell(strings.Join(s.Samples, " / "))}
 	}
-	tgcomp.DataFrameCells(exp, []string{"前綴", "行數", "範例"}, rows, &tgcomp.DataFrameConf{
+	tgcomp.DataFrameCells(exp, []string{"前綴", "行數", "備註", "範例"}, rows, &tgcomp.DataFrameConf{
 		Base:       tgframe.Base{ID: "prefix_suggestions"},
-		ColumnConf: []tgcomp.DataFrameColumnConf{{}, {Type: tgcomp.ColumnTypeNumber}, {}},
+		ColumnConf: []tgcomp.DataFrameColumnConf{{}, {Type: tgcomp.ColumnTypeNumber}, {}, {}},
 	})
-	tgcomp.Caption(exp, "列出行首出現兩次以上的「名稱：」。較少出現的前綴不會自動填入，可自行複製到上方使用。")
+	tgcomp.Caption(exp, "列出行首出現兩次以上的「名稱：」，略過 <details>、HTML 註解與程式碼區塊。"+
+		"較少出現的前綴與疑似狀態欄位（如連續的「姓名：」「年齡：」）不會自動填入，可自行複製到上方使用。")
 }
 
 const rawPreviewLines = 100
@@ -246,8 +251,21 @@ func preview(c *tgframe.Container, msgs []chatlog.Message) {
 		Max:     new(maxN),
 	})
 	for _, m := range msgs[:min(n, len(msgs))] {
-		tgcomp.Text(tgcomp.ChatMessage(c, m.Role), m.Content)
+		tgcomp.Text(tgcomp.ChatMessage(c, m.Role, &tgcomp.ChatMessageConf{Avatar: avatar(m)}), m.Content)
 	}
+}
+
+// avatar gives user-side roles such as "您" a user icon; "" keeps toolgui's
+// default (its own icons for user/assistant, else the first letter).
+func avatar(m chatlog.Message) string {
+	switch strings.ToLower(m.Role) {
+	case "user", "human":
+		return ""
+	}
+	if m.IsUser || chatlog.IsUserRole(m.Role, "") {
+		return "🧑"
+	}
+	return ""
 }
 
 func timestamp() string {

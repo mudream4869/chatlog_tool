@@ -11,12 +11,12 @@ type Message struct {
 }
 
 // IsUserRole reports whether role belongs to the user side. Roles have their
-// colon removed, so userPrefix is matched without its trailing colon.
+// colon and brackets removed, so userPrefix is matched the same way.
 func IsUserRole(role, userPrefix string) bool {
-	p := strings.TrimRight(userPrefix, "：:")
+	p := unwrap(strings.TrimRight(userPrefix, "：:"))
 	return (p != "" && strings.HasPrefix(role, p)) ||
 		strings.Contains(role, "您") ||
-		strings.Contains(role, "User") ||
+		strings.Contains(strings.ToLower(role), "user") ||
 		strings.Contains(role, "用戶")
 }
 
