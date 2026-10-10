@@ -232,7 +232,8 @@ func TestSuggestPrefixes(t *testing.T) {
 	if sugs[0].Count != 3 || sugs[0].Samples[0] != "玩家：你好" {
 		t.Errorf("got %+v", sugs[0])
 	}
-	if got := LikelyPrefixes(sugs); len(got) != 3 {
+	// "他說" sits in lists next to roles, so it is not auto-filled.
+	if got := LikelyPrefixes(sugs); !reflect.DeepEqual(got, []string{"玩家：", "GM："}) {
 		t.Errorf("likely: got %q", got)
 	}
 	if got := SuggestPrefixes("12:30 起床\n12:31 刷牙\nnote http://a\nnote http://b"); len(got) != 0 {
@@ -269,5 +270,26 @@ func TestBracketPrefixes(t *testing.T) {
 	}
 	if RoleOf("[]:") != "[]" || RoleOf("您：") != "您" {
 		t.Error("RoleOf")
+	}
+}
+
+func TestSuggestSkipsStatus(t *testing.T) {
+	turn := "您：我推門\nAI：門開了。\n酒館很熱鬧。\n" +
+		"<details><summary>角色狀態</summary>\nHP：20\nMP：5\n</details>\n" +
+		"<!--\n地點：酒館\n-->\n```\n時間：黃昏\n```\n" +
+		"姓名：楊子由\n\n年齡：21\n身份：工程師\n外貌：黑色短髮\n"
+	sugs := SuggestPrefixes(strings.Repeat(turn, 3))
+	var got []string
+	for _, s := range sugs {
+		got = append(got, s.Prefix)
+		if s.Field != (s.Prefix != "您：" && s.Prefix != "AI：") {
+			t.Errorf("%s: Field = %v", s.Prefix, s.Field)
+		}
+	}
+	if want := []string{"您：", "AI：", "姓名：", "年齡：", "身份：", "外貌："}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q", got)
+	}
+	if got := LikelyPrefixes(sugs); !reflect.DeepEqual(got, []string{"您：", "AI："}) {
+		t.Errorf("likely: got %q", got)
 	}
 }
