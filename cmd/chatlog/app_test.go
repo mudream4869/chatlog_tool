@@ -70,3 +70,31 @@ func TestMainPageBadJSONL(t *testing.T) {
 		t.Error("no SillyTavern format error shown")
 	}
 }
+
+func TestMainPageToast(t *testing.T) {
+	p := tgtest.Open(t, newApp(), "index")
+	p.GetByLabel("沒有檔案？使用範例對話").Input(true)
+	if len(p.FindByName("toast_component")) != 1 {
+		t.Fatal("no load toast")
+	}
+
+	// Changing a setting must not re-toast the same file.
+	p.GetByLabel("移除所有 HTML 標籤").Input(true)
+	if len(p.FindByName("toast_component")) != 0 {
+		t.Error("load toast fired again on rerun")
+	}
+
+	btns := p.Find(func(n *tgtest.Node) bool {
+		return n.String("text") == "📥 下載整理後的 txt 檔案"
+	})
+	if len(btns) != 1 {
+		t.Fatalf("got %d txt download buttons", len(btns))
+	}
+	btns[0].Click()
+	if err := p.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !p.HasText("已下載 TXT 檔案") {
+		t.Error("no download toast")
+	}
+}
