@@ -28,7 +28,7 @@ jobs:
       - run: >-
           go tool toolgui-wasm build -offline -o dist
           -manifest cmd/chatlog/manifest.json -assets cmd/chatlog/assets
-          -icon assets/favicon.ico -head cmd/chatlog/head.html
+          -icon assets/favicon.ico
           ./cmd/chatlog
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

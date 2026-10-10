@@ -124,10 +124,10 @@ func MainPage(p *tgframe.Params) error {
 	tabs := tgcomp.Tab(p.Main, []string{
 		"檔案預覽", "清理後預覽", "匯出 TXT", "匯出 EPUB",
 	})
-	preview(tabs[0], "raw", msgs)
-	preview(tabs[1], "cleaned", cleaned)
-	exportTxt(tabs[2], cleaned)
-	exportEpub(tabs[3], cleaned, st)
+	preview(tabs[0].Scope("raw"), msgs)
+	preview(tabs[1].Scope("cleaned"), cleaned)
+	exportTxt(tabs[2].Scope("txt"), cleaned)
+	exportEpub(tabs[3].Scope("epub"), cleaned, st)
 	return nil
 }
 
@@ -157,10 +157,9 @@ func overview(c *tgframe.Container, name string, msgs, cleaned []chatlog.Message
 		&tgcomp.ChartConf{Height: "240px"})
 }
 
-func preview(c *tgframe.Container, id string, msgs []chatlog.Message) {
+func preview(c *tgframe.Container, msgs []chatlog.Message) {
 	maxN := max(1, min(len(msgs), 50))
 	n := tgcomp.Slider(c, "預覽筆數", &tgcomp.SliderConf[int]{
-		ID:      "preview_" + id,
 		Default: new(min(10, maxN)),
 		Min:     new(1),
 		Max:     new(maxN),
@@ -175,12 +174,8 @@ func timestamp() string {
 }
 
 func exportTxt(c *tgframe.Container, msgs []chatlog.Message) {
-	split := tgcomp.Checkbox(c, "在訊息間加入分隔線", &tgcomp.CheckboxConf{
-		ID: "txt_split", Default: true,
-	})
-	limit := tgcomp.Checkbox(c, "限制連續換行數量至兩行", &tgcomp.CheckboxConf{
-		ID: "txt_limit", Default: true,
-	})
+	split := tgcomp.Checkbox(c, "在訊息間加入分隔線", &tgcomp.CheckboxConf{Default: true})
+	limit := tgcomp.Checkbox(c, "限制連續換行數量至兩行", &tgcomp.CheckboxConf{Default: true})
 
 	opt := chatlog.TxtOptions{SplitLines: split}
 	if limit {
@@ -214,9 +209,7 @@ func exportEpub(c *tgframe.Container, msgs []chatlog.Message, st bool) {
 		Author:     tgcomp.Textbox(c2, "作者名稱", &tgcomp.TextboxConf{Default: "Chatlog Tool"}),
 		UserPrefix: "您：",
 	}
-	if tgcomp.Checkbox(c, "限制連續換行數量至兩行", &tgcomp.CheckboxConf{
-		ID: "epub_limit", Default: true,
-	}) {
+	if tgcomp.Checkbox(c, "限制連續換行數量至兩行", &tgcomp.CheckboxConf{Default: true}) {
 		opt.MaxNewlines = 2
 	}
 
