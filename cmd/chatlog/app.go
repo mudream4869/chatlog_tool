@@ -34,20 +34,64 @@ type settings struct {
 	filters  []chatlog.Filter
 }
 
-func sidebar(c *tgframe.Container) (*tgcomp.FileObject, bool, settings) {
+// source is the loaded chat log.
+type source struct {
+	raw  []byte
+	name string
+	text string // decoded; empty for SillyTavern
+	st   bool   // SillyTavern .jsonl
+}
+
+// key identifies the source across reruns.
+func (s *source) key() string { return fmt.Sprintf("%s/%d", s.name, len(s.raw)) }
+
+// loadSource reads the upload or the sample; nil if neither.
+func loadSource(c *tgframe.Container) (*source, error) {
 	file := tgcomp.FileUpload(c, "上傳對話紀錄檔案", ".txt,.jsonl,text/plain")
 	tgcomp.Caption(c, "支援純文字對話（.txt）與 SillyTavern 聊天紀錄（.jsonl）。")
 	useSample := tgcomp.Toggle(c, "沒有檔案？使用範例對話")
 	tgcomp.Divider(c)
 
+	var src *source
+	switch {
+	case file != nil:
+		b, err := file.Bytes()
+		if err != nil {
+			return nil, err
+		}
+		src = &source{raw: b, name: file.Name, st: chatlog.IsSillyTavernFile(file.Name)}
+	case useSample:
+		src = &source{raw: sampleLog, name: "範例對話"}
+	default:
+		return nil, nil
+	}
+	if !src.st {
+		src.text = chatlog.Decode(src.raw)
+	}
+	return src, nil
+}
+
+func sidebar(c *tgframe.Container, src *source) settings {
 	tgcomp.Subtitle(c, "角色設定")
 	var prefixes string
-	if file != nil && chatlog.IsSillyTavernFile(file.Name) {
+	if src != nil && src.st {
 		tgcomp.Caption(c, "SillyTavern 聊天紀錄（.jsonl）會直接使用檔案中的角色名稱，不需設定角色前綴。")
 	} else {
+		def, resetKey := "您：\nAI：", ""
+		var sugs []chatlog.PrefixSuggestion
+		if src != nil {
+			sugs = chatlog.SuggestPrefixes(src.text)
+			if likely := chatlog.LikelyPrefixes(sugs); len(likely) > 0 {
+				def = strings.Join(likely, "\n")
+			}
+			resetKey = src.key()
+		}
 		prefixes = tgcomp.Textarea(c, "角色前綴（每行一個）",
-			&tgcomp.TextareaConf{Default: "您：\nAI："})
+			&tgcomp.TextareaConf{Default: def, ResetKey: resetKey})
 		tgcomp.Caption(c, "用於辨識對話中不同角色的前綴字串，前綴的最後一個字元需為冒號。")
+		if src != nil {
+			prefixSuggestions(c, sugs)
+		}
 	}
 	tgcomp.Divider(c)
 
@@ -65,62 +109,82 @@ func sidebar(c *tgframe.Container) (*tgcomp.FileObject, bool, settings) {
 		filters = append(filters, chatlog.RemoveHTMLTags)
 	}
 
-	return file, useSample, settings{
+	return settings{
 		prefixes: chatlog.ParsePrefixes(prefixes),
 		filters:  filters,
 	}
 }
 
+// prefixSuggestions lists the detected role prefixes.
+func prefixSuggestions(c *tgframe.Container, sugs []chatlog.PrefixSuggestion) {
+	if len(sugs) == 0 {
+		tgcomp.Caption(c, "偵測不到角色前綴，使用預設值。")
+		return
+	}
+	tgcomp.Caption(c, "🧪 已依檔案內容自動偵測角色前綴（實驗性功能），請確認是否正確。")
+	exp := tgcomp.Expand(c, "偵測到的角色前綴", false)
+	rows := make([][]tgcomp.Cell, len(sugs))
+	for i, s := range sugs {
+		rows[i] = []tgcomp.Cell{tgcomp.TextCell(s.Prefix), tgcomp.NumberCell(float64(s.Count)),
+			tgcomp.TextCell(strings.Join(s.Samples, " / "))}
+	}
+	tgcomp.DataFrameCells(exp, []string{"前綴", "行數", "範例"}, rows, &tgcomp.DataFrameConf{
+		Base:       tgframe.Base{ID: "prefix_suggestions"},
+		ColumnConf: []tgcomp.DataFrameColumnConf{{}, {Type: tgcomp.ColumnTypeNumber}, {}},
+	})
+	tgcomp.Caption(exp, "列出行首出現兩次以上的「名稱：」。較少出現的前綴不會自動填入，可自行複製到上方使用。")
+}
+
+const rawPreviewLines = 100
+
+// rawPreview shows the start of the text so users can find the prefixes.
+func rawPreview(c *tgframe.Container, text string, open bool) {
+	lines := strings.Split(text, "\n")
+	exp := tgcomp.Expand(c, fmt.Sprintf("原始文字（前 %d 行）", rawPreviewLines), open)
+	tgcomp.Code(exp, strings.Join(lines[:min(rawPreviewLines, len(lines))], "\n"),
+		&tgcomp.CodeConf{Base: tgframe.Base{ID: "raw_preview"}, Language: "text"})
+}
+
 func MainPage(p *tgframe.Params) error {
-	file, useSample, s := sidebar(p.Sidebar)
+	src, err := loadSource(p.Sidebar)
+	if err != nil {
+		return err
+	}
+	s := sidebar(p.Sidebar, src)
 
 	tgcomp.Title(p.Main, "💬 對話整理器")
 	tgcomp.Markdown(p.Main, intro)
 
-	var (
-		raw  []byte
-		name string
-		st   bool // SillyTavern .jsonl
-	)
-	switch {
-	case file != nil:
-		b, err := file.Bytes()
-		if err != nil {
-			return err
-		}
-		raw, name = b, file.Name
-		st = chatlog.IsSillyTavernFile(file.Name)
-	case useSample:
-		raw, name = sampleLog, "範例對話"
-	default:
+	if src == nil {
 		p.State.Delete(loadedKey)
 		tgcomp.MessageWarning(p.Main, "請在左側上傳一個對話紀錄檔案（.txt 或 SillyTavern .jsonl），或開啟「使用範例對話」。")
 		return nil
 	}
 
-	var (
-		msgs []chatlog.Message
-		err  error
-	)
-	if st {
-		msgs, err = chatlog.ParseSillyTavern(chatlog.Decode(raw))
+	var msgs []chatlog.Message
+	if src.st {
+		msgs, err = chatlog.ParseSillyTavern(chatlog.Decode(src.raw))
 		if err != nil {
 			tgcomp.MessageDanger(p.Main, err.Error()+"。目前 .jsonl 只支援 SillyTavern 匯出的聊天紀錄。",
 				&tgcomp.MessageConf{Title: "無法辨識對話格式"})
 			return nil
 		}
 	} else {
-		msgs, err = chatlog.ParseText(chatlog.Decode(raw), s.prefixes)
+		msgs, err = chatlog.ParseText(src.text, s.prefixes)
 		if err != nil {
-			tgcomp.MessageDanger(p.Main, err.Error()+"，請確認角色前綴設定。",
+			tgcomp.MessageDanger(p.Main, err.Error()+"，請對照下方原始文字修改左側的角色前綴設定。",
 				&tgcomp.MessageConf{Title: "無法辨識對話格式"})
+			rawPreview(p.Main, src.text, true)
 			return nil
 		}
 	}
 	cleaned := chatlog.Apply(msgs, s.filters...)
 
-	toastLoaded(p, name, len(raw), len(msgs), st)
-	overview(p.Main, name, msgs, cleaned)
+	toastLoaded(p, src, len(msgs))
+	overview(p.Main, src.name, msgs, cleaned)
+	if !src.st {
+		rawPreview(p.Main, src.text, false)
+	}
 
 	tabs := tgcomp.Tab(p.Main, []string{
 		"檔案預覽", "清理後預覽", "匯出 TXT", "匯出 EPUB",
@@ -128,21 +192,21 @@ func MainPage(p *tgframe.Params) error {
 	preview(tabs[0].Scope("raw"), msgs)
 	preview(tabs[1].Scope("cleaned"), cleaned)
 	exportTxt(tabs[2].Scope("txt"), cleaned)
-	exportEpub(tabs[3].Scope("epub"), cleaned, st)
+	exportEpub(tabs[3].Scope("epub"), cleaned, src.st)
 	return nil
 }
 
 const loadedKey = "chatlog.loaded"
 
 // toastLoaded toasts only when the source changes, not on every rerun.
-func toastLoaded(p *tgframe.Params, name string, size, n int, st bool) {
-	key := fmt.Sprintf("%s/%d", name, size)
+func toastLoaded(p *tgframe.Params, src *source, n int) {
+	key := src.key()
 	if last, _ := p.State.Get[string](loadedKey); last == key {
 		return
 	}
 	p.State.Set(loadedKey, key)
-	text := fmt.Sprintf("成功載入「%s」，共 %d 筆訊息。", name, n)
-	if st {
+	text := fmt.Sprintf("成功載入「%s」，共 %d 筆訊息。", src.name, n)
+	if src.st {
 		text = "已依 SillyTavern 聊天紀錄（.jsonl）格式" + text
 	}
 	tgcomp.Toast(p.Main, text, &tgcomp.ToastConf{Icon: "✅"})
