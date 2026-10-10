@@ -20,7 +20,7 @@
 
 ## 使用方式
 
-需要 Go 1.27.1 以上（或設定 `GOTOOLCHAIN=auto` 讓 Go 自動下載）。
+需要 Go 1.27.2 以上（或設定 `GOTOOLCHAIN=auto` 讓 Go 自動下載）。
 
 ```bash
 # 本機伺服器模式
@@ -29,11 +29,11 @@ go run ./cmd/chatlog
 
 # 瀏覽器模式（WebAssembly）
 go tool toolgui-wasm serve -manifest cmd/chatlog/manifest.json -assets cmd/chatlog/assets \
-  -icon assets/favicon.ico -head cmd/chatlog/head.html ./cmd/chatlog
+  -icon assets/favicon.ico ./cmd/chatlog
 
 # 產生靜態網站到 dist/
 go tool toolgui-wasm build -offline -o dist -manifest cmd/chatlog/manifest.json -assets cmd/chatlog/assets \
-  -icon assets/favicon.ico -head cmd/chatlog/head.html ./cmd/chatlog
+  -icon assets/favicon.ico ./cmd/chatlog
 ```
 
 推送到 `main` 時，GitHub Actions 會自動建置並部署到 GitHub Pages（需在 repo 設定中將 Pages 來源設為 GitHub Actions）。

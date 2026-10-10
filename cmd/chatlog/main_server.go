@@ -17,8 +17,6 @@ var (
 	assets embed.FS
 	//go:embed manifest.json
 	manifestJSON []byte
-	//go:embed head.html
-	headHTML string
 )
 
 func main() {
@@ -37,7 +35,6 @@ func main() {
 	e := tgexec.NewWebExecutor(newApp())
 	e.SetManifest(&manifest)
 	e.SetAssets(sub)
-	e.SetHeadHTML(headHTML)
 
 	log.Printf("Serving on http://%s", *addr)
 	if err := e.StartService(*addr); err != nil {
