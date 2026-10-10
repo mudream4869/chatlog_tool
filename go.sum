@@ -1,5 +1,5 @@
-github.com/voilelab/toolgui v0.14.0 h1:yV8Li73N7HmNiMmZcQLArXzXJTdJ2ut+H2n11/o3MqI=
-github.com/voilelab/toolgui v0.14.0/go.mod h1:e93gfQHG/n/o8X58i8L8QjwpMKSMB9BTXXi5lK7gE3Y=
+github.com/voilelab/toolgui v0.15.0 h1:Nvv40ATXERlc9VZOAmhCM6XD+GozxMBB5lZOMh8SVjw=
+github.com/voilelab/toolgui v0.15.0/go.mod h1:e93gfQHG/n/o8X58i8L8QjwpMKSMB9BTXXi5lK7gE3Y=
 golang.org/x/net v0.60.0 h1:79p50tfZlm0J9YfoDsSi639qSXNGVwEzOPLCxM2FsYU=
 golang.org/x/net v0.60.0/go.mod h1:2DA/G1UfVbCpQPeWTmMPGY7Cs2PkBkwu743bVX5PIVg=
 golang.org/x/text v0.42.0 h1:JbOZXgfeCPU9gacVtYliJqOhD+zhrEqK4LfdpmlUZqI=
